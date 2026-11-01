@@ -1,0 +1,125 @@
+#include "Scheduler.h"
+
+#include <chrono>
+
+namespace {
+// Real-time length of one CPU tick. TODO(Member 2): tune (or make it configurable).
+constexpr int kTickSleepMs = 10;
+}
+
+Scheduler::Scheduler(const Config& cfg, ProcessFactory& factory)
+    : cfg_(cfg), factory_(factory), runningPerCore_(static_cast<std::size_t>(cfg.numCpu)) {}
+
+Scheduler::~Scheduler() { stop(); }
+
+void Scheduler::start() {
+    {
+        std::lock_guard<std::mutex> lk(tickMtx_);
+        if (running_) return;
+        running_ = true;
+    }
+    tickThread_ = std::thread(&Scheduler::tickLoop, this);
+    for (int i = 0; i < cfg_.numCpu; ++i)
+        coreThreads_.emplace_back(&Scheduler::coreLoop, this, i);
+}
+
+void Scheduler::stop() {
+    {
+        std::lock_guard<std::mutex> lk(tickMtx_);
+        if (!running_) return;
+        running_ = false;
+    }
+    tickCv_.notify_all();
+    if (tickThread_.joinable()) tickThread_.join();
+    for (auto& t : coreThreads_)
+        if (t.joinable()) t.join();
+    coreThreads_.clear();
+}
+
+void Scheduler::addProcess(std::shared_ptr<Process> p) {
+    std::lock_guard<std::mutex> lk(stateMtx_);
+    allProcesses_.push_back(p);
+    readyQueue_.push_back(std::move(p));
+}
+
+std::shared_ptr<Process> Scheduler::findActiveProcess(const std::string& name) const {
+    std::lock_guard<std::mutex> lk(stateMtx_);
+    for (const auto& p : allProcesses_)
+        if (p->name() == name && !p->isFinished()) return p;
+    return nullptr;
+}
+
+std::uint64_t Scheduler::currentTick() const {
+    std::lock_guard<std::mutex> lk(tickMtx_);
+    return tick_;
+}
+
+SchedulerSnapshot Scheduler::snapshot() const {
+    std::lock_guard<std::mutex> lk(stateMtx_);
+    SchedulerSnapshot s;
+    s.totalCores = cfg_.numCpu;
+    for (int core = 0; core < cfg_.numCpu; ++core) {
+        if (runningPerCore_[core]) {
+            ++s.coresUsed;
+            s.running.push_back({runningPerCore_[core], core});
+        }
+    }
+    s.coresAvailable = s.totalCores - s.coresUsed;
+    s.utilizationPercent = s.totalCores ? 100.0 * s.coresUsed / s.totalCores : 0.0;
+    s.finished = finished_;
+    return s;
+}
+
+std::shared_ptr<Process> Scheduler::takeNextReady() {
+    std::lock_guard<std::mutex> lk(stateMtx_);
+    if (readyQueue_.empty()) return nullptr;
+    auto p = readyQueue_.front();
+    readyQueue_.pop_front();
+    return p;
+}
+
+std::uint64_t Scheduler::waitForTick(std::uint64_t lastSeen) {
+    std::unique_lock<std::mutex> lk(tickMtx_);
+    tickCv_.wait(lk, [&] { return tick_ > lastSeen || !running_; });
+    return tick_;
+}
+
+void Scheduler::tickLoop() {
+    while (running_) {
+        std::uint64_t now;
+        {
+            std::lock_guard<std::mutex> lk(tickMtx_);
+            now = ++tick_;
+        }
+        tickCv_.notify_all();
+
+        // "scheduler-start": every batch-process-freq ticks, spawn a dummy process.
+        if (generating_ && cfg_.batchProcessFreq > 0 && now % cfg_.batchProcessFreq == 0)
+            addProcess(factory_.createAuto());
+
+        // TODO(Member 2): consider a barrier so all cores finish tick N before tick N+1 starts.
+        std::this_thread::sleep_for(std::chrono::milliseconds(kTickSleepMs));
+    }
+}
+
+void Scheduler::coreLoop(int coreId) {
+    std::uint64_t lastTick = 0;
+    std::uint64_t quantumUsed = 0;
+    (void)quantumUsed;
+
+    while (running_) {
+        lastTick = waitForTick(lastTick);
+        if (!running_) break;
+
+        // TODO(Member 2): implement one tick of work for this core:
+        //   1. If runningPerCore_[coreId] is empty -> takeNextReady() and assign it (under stateMtx_).
+        //   2. If cfg_.delaysPerExec > 0, busy-wait that many ticks before the next instruction.
+        //   3. proc->executeNext(coreId, lastTick);
+        //   4. If proc->isFinished()   -> move to finished_, free the core.
+        //   5. If proc->isSleeping()   -> push back to readyQueue_, free the core.
+        //   6. If cfg_.scheduler == "rr" and ++quantumUsed >= cfg_.quantumCycles
+        //        -> preempt: push back to readyQueue_, free the core, reset quantumUsed.
+        //   7. FCFS = never preempt; run until finished or sleeping.
+        (void)coreId;
+    }
+}
