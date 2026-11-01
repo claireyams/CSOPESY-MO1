@@ -9,7 +9,8 @@ Process::Process(int id, std::string name, std::vector<Instruction> flatProgram)
     : id_(id),
       name_(std::move(name)),
       createdAt_(timestampNow()),
-      program_(std::move(flatProgram)) {
+      program_(std::move(flatProgram)),
+      totalLines_(program_.size()) {
     if (program_.empty()) finished_ = true;
 }
 
@@ -51,43 +52,57 @@ std::uint16_t Process::clampSub(std::int32_t a, std::int32_t b) {
 
 std::uint16_t Process::resolve(const Operand& op) {
     if (!op.isVariable) return op.literal;
-    // operator[] default-constructs to 0 => "auto-declared with a value of 0"
+    // operator[] default-constructs to 0 -> "auto-declared with a value of 0"
     return vars_[op.varName];
+}
+
+void Process::markFinished() {
+    finished_ = true;
+    // spec: variables are released when the process finishes. Also free the instruction list
+    // (totalLines_ keeps the line count for process-smi / reports).
+    vars_.clear();
+    program_.clear();
+    program_.shrink_to_fit();
 }
 
 void Process::executeNext(int coreId, std::uint64_t currentTick) {
     std::lock_guard<std::mutex> lk(mtx_);
     if (finished_) return;
-    if (currentTick < sleepUntilTick_) return;  // still asleep, core should be relinquished
-    if (pc_ >= program_.size()) { finished_ = true; return; }
+    if (currentTick < sleepUntilTick_) return;
+    if (pc_ >= program_.size()) { markFinished(); return; }
 
     lastCore_ = coreId;
     const Instruction& ins = program_[pc_];
 
     switch (ins.type) {
-        case InstructionType::PRINT:
-            // TODO(Member 3): build msg (+ optional variable value) and push a LogEntry
-            //   { timestampNow(), coreId, text } into logs_.
+        case InstructionType::PRINT: {
+            std::string text = ins.msg;
+            if (!ins.printVar.empty()) text += std::to_string(vars_[ins.printVar]);
+            logs_.push_back({timestampNow(), coreId, std::move(text)});
             break;
+        }
         case InstructionType::DECLARE:
-            // TODO(Member 3): vars_[ins.target] = ins.lhs.literal;
+            vars_[ins.target] = ins.lhs.literal;
             break;
-        case InstructionType::ADD:
-            // TODO(Member 3): vars_[ins.target] = clampAdd(resolve(ins.lhs), resolve(ins.rhs));
+        case InstructionType::ADD: {
+            const std::uint16_t a = resolve(ins.lhs);
+            const std::uint16_t b = resolve(ins.rhs);
+            vars_[ins.target] = clampAdd(a, b);
             break;
-        case InstructionType::SUBTRACT:
-            // TODO(Member 3): vars_[ins.target] = clampSub(resolve(ins.lhs), resolve(ins.rhs));
+        }
+        case InstructionType::SUBTRACT: {
+            const std::uint16_t a = resolve(ins.lhs);
+            const std::uint16_t b = resolve(ins.rhs);
+            vars_[ins.target] = clampSub(a, b);
             break;
+        }
         case InstructionType::SLEEP:
-            // TODO(Member 3): sleepUntilTick_ = currentTick + ins.sleepTicks;
-            //   (Member 2's scheduler must notice isSleeping() and free the core.)
+            sleepUntilTick_ = currentTick + ins.sleepTicks;
             break;
         case InstructionType::FOR:
-            // Not expected here: flattenProgram() should have unrolled all FORs.
             break;
     }
 
     ++pc_;
-    if (pc_ >= program_.size()) finished_ = true;
-    // TODO(Member 3/4): record a finish timestamp if the report needs it.
+    if (pc_ >= program_.size()) markFinished();
 }
