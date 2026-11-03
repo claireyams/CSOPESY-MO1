@@ -17,7 +17,7 @@ void Console::printBanner() const {
               << "Welcome to CSOPESY Emulator!\n\n"
               << "Developers:\n"
               << "  Kristopher Lance Chiu\n"
-              << "  [Member 2 name]\n"
+              << "  Diana Angela Ramirez\n"
               << "  Rhian Claire Yamsuan\n"
               << "  [Member 4 name]\n\n"
               << "Last updated: 11-03-2026\n"
