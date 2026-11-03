@@ -16,8 +16,11 @@ void Console::printBanner() const {
     std::cout << "-------------------------------------------\n"
               << "Welcome to CSOPESY Emulator!\n\n"
               << "Developers:\n"
-              << "  TODO(Member 1): put your group members' names here\n\n"
-              << "Last updated: TODO\n"
+              << "  Kristopher Lance Chiu\n"
+              << "  [Member 2 name]\n"
+              << "  Rhian Claire Yamsuan\n"
+              << "  [Member 4 name]\n\n"
+              << "Last updated: 11-03-2026\n"
               << "-------------------------------------------\n";
 }
 
@@ -40,14 +43,20 @@ bool Console::handleMainCommand(const std::string& line) {
 
     const std::string cmd = toLower(args[0]);
 
-    if (cmd == "exit") return false;
-
     // Spec: nothing but "initialize" and "exit" is recognized before initialization.
-    if (!initialized_) {
-        if (cmd == "initialize") cmdInitialize();
-        else std::cout << "Please run 'initialize' first.\n";
+    if (!initialized_ && cmd != "initialize" && cmd != "exit") {
+        std::cout << "Please run 'initialize' first.\n";
         return true;
     }
+
+    const bool takesNoArguments = cmd == "initialize" || cmd == "exit"
+        || cmd == "scheduler-start" || cmd == "scheduler-stop" || cmd == "report-util";
+    if (takesNoArguments && args.size() != 1) {
+        std::cout << "Usage: " << cmd << "\n";
+        return true;
+    }
+
+    if (cmd == "exit") return false;
 
     if (cmd == "initialize")           cmdInitialize();      // re-initialize
     else if (cmd == "screen")          cmdScreen(args);
@@ -81,62 +90,112 @@ void Console::cmdInitialize() {
 }
 
 void Console::cmdSchedulerStart() {
-    // TODO(Member 1): print feedback, and avoid doing anything weird if already running.
+    if (scheduler_->isGenerating()) {
+        std::cout << "Process generation is already running.\n";
+        return;
+    }
     scheduler_->setGenerating(true);
+    std::cout << "Process generation started.\n";
 }
 
 void Console::cmdSchedulerStop() {
+    if (!scheduler_->isGenerating()) {
+        std::cout << "Process generation is already stopped.\n";
+        return;
+    }
     scheduler_->setGenerating(false);
+    std::cout << "Process generation stopped.\n";
 }
 
 void Console::cmdReportUtil() {
-    // TODO(Member 1 + 4): build the report, save to "csopesy-log.txt", then print
-    //   "Report generated at <path>!" (see mockup, lines 56-57 of the spec).
-    //   Hint: saveReport("csopesy-log.txt", buildUtilizationReport(scheduler_->snapshot()));
+    const std::string path = "csopesy-log.txt";
+    const auto report = buildUtilizationReport(scheduler_->snapshot());
+    if (saveReport(path, report))
+        std::cout << "Report generated at " << path << "!\n";
+    else
+        std::cout << "Could not save report to " << path << ".\n";
 }
 
 void Console::cmdScreen(const std::vector<std::string>& args) {
-    // TODO(Member 1): parse and dispatch:
-    //   screen -s <name>  -> cmdScreenNew(name)
-    //   screen -r <name>  -> cmdScreenResume(name)
-    //   screen -ls        -> cmdScreenList()
-    //   anything else     -> print a usage message
-    (void)args;
-    std::cout << "screen: not implemented yet.\n";
+    if (args.size() == 2 && toLower(args[1]) == "-ls")
+        cmdScreenList();
+    else if (args.size() == 3 && toLower(args[1]) == "-s")
+        cmdScreenNew(args[2]);
+    else if (args.size() == 3 && toLower(args[1]) == "-r")
+        cmdScreenResume(args[2]);
+    else
+        std::cout << "Usage: screen -s <name> | screen -r <name> | screen -ls\n";
 }
 
 void Console::cmdScreenList() {
-    // TODO(Member 1): print buildUtilizationReport(scheduler_->snapshot()).
+    std::cout << buildUtilizationReport(scheduler_->snapshot());
 }
 
 void Console::cmdScreenNew(const std::string& name) {
-    // TODO(Member 1): create via factory_->createNamed(name), scheduler_->addProcess(...),
-    //   then enterProcessScreen(proc). Reject duplicate / empty names.
-    (void)name;
+    if (name.empty()) {
+        std::cout << "Process name cannot be empty.\n";
+        return;
+    }
+    // The factory owns collision handling with automatically generated names.
+    if (scheduler_->findActiveProcess(name)) {
+        std::cout << "Process " << name << " already exists.\n";
+        return;
+    }
+
+    auto proc = factory_->createNamed(name);
+    if (!proc) {
+        std::cout << "Could not create process " << name << ".\n";
+        return;
+    }
+    scheduler_->addProcess(proc);
+    enterProcessScreen(proc);
 }
 
 void Console::cmdScreenResume(const std::string& name) {
-    // TODO(Member 1): auto p = scheduler_->findActiveProcess(name);
-    //   if (!p) print "Process <name> not found."; else enterProcessScreen(p).
-    (void)name;
+    auto proc = scheduler_->findActiveProcess(name);
+    if (!proc) {
+        std::cout << "Process " << name << " not found.\n";
+        return;
+    }
+    enterProcessScreen(proc);
 }
 
 void Console::enterProcessScreen(std::shared_ptr<Process> proc) {
-    // TODO(Member 1): clearScreen(), print process info, then loop:
-    //   "process-smi" -> printProcessSmi(*proc)
-    //   "exit"        -> clearScreen(), reprint banner, return to main menu
-    (void)proc;
+    clearScreen();
+    printProcessSmi(*proc);
+
+    std::string line;
+    while (true) {
+        std::cout << "root:\\> " << std::flush;
+        if (!std::getline(std::cin, line)) return;
+        const auto args = splitWords(line);
+        if (args.empty()) continue;
+
+        const std::string cmd = toLower(args[0]);
+        if (args.size() == 1 && cmd == "exit") {
+            clearScreen();
+            printBanner();
+            return;
+        }
+        if (args.size() == 1 && cmd == "process-smi")
+            printProcessSmi(*proc);
+        else
+            std::cout << "Available process commands: process-smi, exit\n";
+    }
 }
 
 void Console::printProcessSmi(const Process& proc) const {
-    // TODO(Member 1): print (see spec mockup lines 162-198):
-    //   Process name: <name>
-    //   ID: <id>
-    //   Logs:
-    //   (<timestamp>) Core:<n> "<message>"   <- one per proc.logs()
-    //   (blank)
-    //   Current instruction line: <currentLine>
-    //   Lines of code: <totalLines>
-    //   If proc.isFinished() print "Finished!" after the logs.
-    (void)proc;
+    const bool finished = proc.isFinished();
+    std::cout << "Process name: " << proc.name() << "\n"
+              << "ID: " << proc.id() << "\n"
+              << "Logs:\n";
+    for (const auto& log : proc.logs())
+        std::cout << "(" << log.timestamp << ") Core:" << log.core
+                  << " \"" << log.message << "\"\n";
+
+    if (finished)
+        std::cout << "\nFinished!\n\n";
+    else
+        std::cout << "\nCurrent instruction line: " << proc.currentLine() << "\n"
+                  << "Lines of code: " << proc.totalLines() << "\n\n";
 }
