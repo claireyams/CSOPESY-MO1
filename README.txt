@@ -1,8 +1,8 @@
 CSOPESY Major Output 1 - Process Scheduler and CLI
 ===================================================
 Group members:
-  1. <name>  (Member 1)
-  2. <name>  (Member 2)
+  1. Chiu, Kristopher Lance
+  2. Ramirez, Diana Angela
   3. Yamsuan, Rhian Claire
   4. <name>  (Member 4)
 
