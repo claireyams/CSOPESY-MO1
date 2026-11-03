@@ -3,8 +3,8 @@
 #include <chrono>
 
 namespace {
-// Real-time length of one CPU tick. TODO(Member 2): tune (or make it configurable).
-constexpr int kTickSleepMs = 10;
+// Real-time length of one CPU tick. 
+constexpr int kTickSleepMs = 5;
 }
 
 Scheduler::Scheduler(const Config& cfg, ProcessFactory& factory)
@@ -30,6 +30,7 @@ void Scheduler::stop() {
         running_ = false;
     }
     tickCv_.notify_all();
+    donceCv_.notify_all();
     if (tickThread_.joinable()) tickThread_.join();
     for (auto& t : coreThreads_)
         if (t.joinable()) t.join();
@@ -105,21 +106,67 @@ void Scheduler::tickLoop() {
 void Scheduler::coreLoop(int coreId) {
     std::uint64_t lastTick = 0;
     std::uint64_t quantumUsed = 0;
-    (void)quantumUsed;
-
+    std::uint64_t delayLeft = 0;
+    std::shared_ptr<Process> cur;
+ 
+    // Caller must hold stateMtx_. Picks the first non-sleeping ready process (or none).
+    auto dispatchLocked = [&](std::uint64_t tick) {
+        cur = nullptr;
+        for (auto it = readyQueue_.begin(); it != readyQueue_.end(); ++it) {
+            if (!(*it)->isSleeping(tick)) {
+                cur = *it;
+                readyQueue_.erase(it);
+                break;
+            }
+        }
+        runningPerCore_[coreId] = cur;
+        quantumUsed = 0;
+        delayLeft = 0;
+    };
+ 
     while (running_) {
         lastTick = waitForTick(lastTick);
         if (!running_) break;
-
-        // TODO(Member 2): implement one tick of work for this core:
-        //   1. If runningPerCore_[coreId] is empty -> takeNextReady() and assign it (under stateMtx_).
-        //   2. If cfg_.delaysPerExec > 0, busy-wait that many ticks before the next instruction.
-        //   3. proc->executeNext(coreId, lastTick);
-        //   4. If proc->isFinished()   -> move to finished_, free the core.
-        //   5. If proc->isSleeping()   -> push back to readyQueue_, free the core.
-        //   6. If cfg_.scheduler == "rr" and ++quantumUsed >= cfg_.quantumCycles
-        //        -> preempt: push back to readyQueue_, free the core, reset quantumUsed.
-        //   7. FCFS = never preempt; run until finished or sleeping.
-        (void)coreId;
+ 
+        // 1. Free core -> pick up a process.
+        if (!cur) {
+            std::lock_guard<std::mutex> lk(stateMtx_);
+            dispatchLocked(lastTick);
+        }
+ 
+        if (cur) {
+            // 2. One CPU cycle on this core.
+            ++quantumUsed;
+            if (delayLeft > 0) {
+                --delayLeft;  // busy-wait: process keeps the core, no instruction executed
+            } else {
+                cur->executeNext(coreId, lastTick);
+                delayLeft = cfg_.delaysPerExec;  // 0 => one instruction per cycle
+            }
+ 
+            // 3. Decide what happens to the process.
+            const bool done     = cur->isFinished();
+            const bool sleeping = !done && cur->isSleeping(lastTick);
+            const bool expired  = !done && !sleeping && cfg_.scheduler == "rr" &&
+                                  quantumUsed >= cfg_.quantumCycles;
+ 
+            if (done || sleeping || expired) {
+                // Release + requeue + next dispatch in one critical section so snapshot()
+                // never sees an empty core while work is waiting.
+                std::lock_guard<std::mutex> lk(stateMtx_);
+                if (done)
+                    finished_.push_back(cur);
+                else
+                    readyQueue_.push_back(cur);  // sleeping (relinquish CPU) or RR preempt
+                dispatchLocked(lastTick);
+            }
+        }
+ 
+        // 4. Tell the tick thread this core is done with the tick (even when idle).
+        {
+            std::lock_guard<std::mutex> lk(tickMtx_);
+            ++coresDone_;
+        }
+        doneCv_.notify_one();
     }
 }

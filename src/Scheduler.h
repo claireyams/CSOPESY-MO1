@@ -67,6 +67,9 @@ private:
     std::atomic<bool>       running_{false};
     std::atomic<bool>       generating_{false};
 
+    std::uint64_t           coresDone_ = 0; 
+    std::condition_variable doneCv_; 
+
     // scheduler state (guarded by stateMtx_)
     mutable std::mutex                    stateMtx_;
     std::deque<std::shared_ptr<Process>>  readyQueue_;
