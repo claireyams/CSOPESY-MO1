@@ -30,7 +30,7 @@ void Scheduler::stop() {
         running_ = false;
     }
     tickCv_.notify_all();
-    donceCv_.notify_all();
+    doneCv_.notify_all();
     if (tickThread_.joinable()) tickThread_.join();
     for (auto& t : coreThreads_)
         if (t.joinable()) t.join();
