@@ -65,10 +65,15 @@ void Process::markFinished() {
     program_.shrink_to_fit();
 }
 
-void Process::executeNext(int coreId, std::uint64_t currentTick) {
+void Process::executeNext(int coreId, std::uint64_t currentTick,
+                          std::uint64_t delaysPerExec) {
     std::lock_guard<std::mutex> lk(mtx_);
     if (finished_) return;
     if (currentTick < sleepUntilTick_) return;
+    if (delayLeft_ > 0) {
+        --delayLeft_;
+        return;
+    }
     if (pc_ >= program_.size()) { markFinished(); return; }
 
     lastCore_ = coreId;
@@ -104,5 +109,6 @@ void Process::executeNext(int coreId, std::uint64_t currentTick) {
     }
 
     ++pc_;
+    delayLeft_ = delaysPerExec;
     if (pc_ >= program_.size()) markFinished();
 }

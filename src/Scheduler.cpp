@@ -106,7 +106,6 @@ void Scheduler::tickLoop() {
 void Scheduler::coreLoop(int coreId) {
     std::uint64_t lastTick = 0;
     std::uint64_t quantumUsed = 0;
-    std::uint64_t delayLeft = 0;
     std::shared_ptr<Process> cur;
  
     // Caller must hold stateMtx_. Picks the first non-sleeping ready process (or none).
@@ -121,7 +120,6 @@ void Scheduler::coreLoop(int coreId) {
         }
         runningPerCore_[coreId] = cur;
         quantumUsed = 0;
-        delayLeft = 0;
     };
  
     while (running_) {
@@ -137,12 +135,8 @@ void Scheduler::coreLoop(int coreId) {
         if (cur) {
             // 2. One CPU cycle on this core.
             ++quantumUsed;
-            if (delayLeft > 0) {
-                --delayLeft;  // busy-wait: process keeps the core, no instruction executed
-            } else {
-                cur->executeNext(coreId, lastTick);
-                delayLeft = cfg_.delaysPerExec;  // 0 => one instruction per cycle
-            }
+            // The process remembers its delay when preempted or moved to another core.
+            cur->executeNext(coreId, lastTick, cfg_.delaysPerExec);
  
             // 3. Decide what happens to the process.
             const bool done     = cur->isFinished();

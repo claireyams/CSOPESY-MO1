@@ -12,3 +12,8 @@ Unit tests (run from the repo root):
   g++ -std=c++17 -pthread -Isrc tests/test_factory.cpp src/ProcessFactory.cpp src/Process.cpp \
       src/Instruction.cpp src/Utils.cpp -o test_factory
   ./test_factory
+
+Instruction-delay regression tests (remaining delay survives turns and core changes):
+
+  g++ -std=c++17 -pthread -iquote src tests/test_process_delay.cpp src/Process.cpp src/Utils.cpp -o test_process_delay
+  ./test_process_delay

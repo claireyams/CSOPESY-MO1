@@ -21,9 +21,11 @@ public:
     Process(int id, std::string name, std::vector<Instruction> flatProgram);
 
     // called by the scheduler (Member 2) 
-    // executes 1 instruction on 'coreId' at CPU tick 'currentTick'
-    // does nothing if the process is finished or still sleeping
-    void executeNext(int coreId, std::uint64_t currentTick);
+    // Runs one CPU cycle on 'coreId' at CPU tick 'currentTick'.
+    // Busy-wait cycles consume this process's remaining instruction delay.
+    // Does nothing if the process is finished or still sleeping.
+    void executeNext(int coreId, std::uint64_t currentTick,
+                     std::uint64_t delaysPerExec = 0);
 
     // read-only info for the console / reports 
     int                      id() const { return id_; }
@@ -53,6 +55,8 @@ private:
     std::unordered_map<std::string, std::uint16_t> vars_;
     std::vector<LogEntry>                         logs_;
     std::uint64_t                                 sleepUntilTick_ = 0;
+    // Follows the process across RR preemption and moves between cores.
+    std::uint64_t                                 delayLeft_ = 0;
     bool                                          finished_ = false;
     int                                           lastCore_ = -1;
 
