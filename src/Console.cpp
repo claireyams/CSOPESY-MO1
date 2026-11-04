@@ -20,7 +20,7 @@ void Console::printBanner() const {
               << "  Diana Angela Ramirez\n"
               << "  Rhian Claire Yamsuan\n"
               << "  Xan Luo Ke\n\n"
-              << "Last updated: 11-03-2026\n"
+              << "Last updated: 11-05-2026\n"
               << "-------------------------------------------\n";
 }
 
@@ -30,7 +30,7 @@ void Console::run() {
 
     std::string line;
     while (true) {
-        std::cout << "root:\\> " << std::flush;
+        std::cout << "\nroot:\\> " << std::flush;
         if (!std::getline(std::cin, line)) break;
         if (!handleMainCommand(line)) break;
     }
@@ -167,7 +167,7 @@ void Console::enterProcessScreen(std::shared_ptr<Process> proc) {
 
     std::string line;
     while (true) {
-        std::cout << "root:\\> " << std::flush;
+        std::cout << "\nroot:\\> " << std::flush;
         if (!std::getline(std::cin, line)) return;
         const auto args = splitWords(line);
         if (args.empty()) continue;
