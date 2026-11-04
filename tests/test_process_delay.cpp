@@ -19,6 +19,14 @@ Instruction printInstruction() {
     return ins;
 }
 
+Instruction printVariableInstruction(const std::string& variable) {
+    Instruction ins;
+    ins.type = InstructionType::PRINT;
+    ins.msg = "Value from: ";
+    ins.printVar = variable;
+    return ins;
+}
+
 }  // namespace
 
 int main() {
@@ -50,6 +58,26 @@ int main() {
         expect(noDelay.currentLine() == tick, "zero delay must allow one instruction per cycle");
     }
     expect(noDelay.isFinished(), "the final instruction must finish without an extra delay");
+
+    Instruction declareX;
+    declareX.type = InstructionType::DECLARE;
+    declareX.target = "x";
+    declareX.lhs.literal = 42;
+    Process variablePrint(3, "variable-print", {
+        declareX,
+        printVariableInstruction("x"),
+        printVariableInstruction("y")
+    });
+    variablePrint.executeNext(0, 1, 0);
+    variablePrint.executeNext(0, 2, 0);
+    variablePrint.executeNext(0, 3, 0);
+    expect(variablePrint.isFinished(), "variable PRINT instructions must execute and finish");
+    const auto variableLogs = variablePrint.logs();
+    expect(variableLogs.size() == 2, "PRINT must log both declared and auto-declared variables");
+    expect(variableLogs[0].message == "Value from: 42",
+           "PRINT must append the declared variable value");
+    expect(variableLogs[1].message == "Value from: 0",
+           "undeclared variables used by PRINT must default to zero");
 
     Instruction sleep;
     sleep.type = InstructionType::SLEEP;

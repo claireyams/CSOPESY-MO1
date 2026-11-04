@@ -3,10 +3,9 @@
 #include <string>
 #include <vector>
 
-// Barebones process instructions (see "Barebones process instructions" in the spec).
+// barebones process instructions
 enum class InstructionType { PRINT, DECLARE, ADD, SUBTRACT, SLEEP, FOR };
 
-// Either a variable name or a uint16 literal.
 struct Operand {
     bool          isVariable = false;
     std::string   varName;
@@ -33,12 +32,12 @@ struct Instruction {
     std::uint32_t            repeats = 0;
 };
 
-// Builds a random (possibly nested) program whose executed length is within [minIns, maxIns].
+// builds a random (possibly nested) program whose executed length is within [minIns, maxIns].
 // PRINT msgs default to "Hello world from <processName>!".
 std::vector<Instruction> generateRandomProgram(std::uint64_t minIns,
                                                std::uint64_t maxIns,
                                                const std::string& processName);
 
-// Expands FOR loops into a flat list so Process can just walk it with a program counter
+// expands FOR loops into a flat list so Process can just walk it with a program counter
 // (this also makes "current instruction line / lines of code" trivial).
 std::vector<Instruction> flattenProgram(const std::vector<Instruction>& nested);

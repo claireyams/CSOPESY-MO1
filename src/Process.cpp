@@ -58,8 +58,6 @@ std::uint16_t Process::resolve(const Operand& op) {
 
 void Process::markFinished() {
     finished_ = true;
-    // spec: variables are released when the process finishes. Also free the instruction list
-    // (totalLines_ keeps the line count for process-smi / reports).
     vars_.clear();
     program_.clear();
     program_.shrink_to_fit();

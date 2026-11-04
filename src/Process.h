@@ -9,18 +9,18 @@
 #include "Instruction.h"
 
 struct LogEntry {
-    std::string timestamp;  // ex: "08/06/2024 09:15:22AM"
+    std::string timestamp;  
     int         core = -1;
-    std::string message;    // ex: "Hello world from screen_01!"
+    std::string message;    
 };
 
 // a single emulated process. Worker (core) threads call executeNext();
-// the console thread reads state for process-smi / screen -ls, so everything is mutex-guarded
+// the console thread reads state for process-smi / screen -ls
 class Process {
 public:
     Process(int id, std::string name, std::vector<Instruction> flatProgram);
 
-    // called by the scheduler (Member 2) 
+    // called by the scheduler
     // Runs one CPU cycle on 'coreId' at CPU tick 'currentTick'.
     // Busy-wait cycles consume this process's remaining instruction delay.
     // Does nothing if the process is finished or still sleeping.
@@ -55,7 +55,7 @@ private:
     std::unordered_map<std::string, std::uint16_t> vars_;
     std::vector<LogEntry>                         logs_;
     std::uint64_t                                 sleepUntilTick_ = 0;
-    // Follows the process across RR preemption and moves between cores.
+    // follows the process across RR preemption and moves between cores.
     std::uint64_t                                 delayLeft_ = 0;
     bool                                          finished_ = false;
     int                                           lastCore_ = -1;

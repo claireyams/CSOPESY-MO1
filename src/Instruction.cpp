@@ -43,8 +43,13 @@ Instruction makeSimple(const std::string& processName) {
     const auto roll = randInt(0, 99);
     if (roll < 30) {
         ins.type = InstructionType::PRINT;
-        // msg is always "Hello world from <process_name>!" unless a test case says otherwise
-        ins.msg = "Hello world from " + processName + "!";
+        if (randInt(0, 99) < 50) {
+            // Keep the specified default message for most generated PRINT instructions.
+            ins.msg = "Hello world from " + processName + "!";
+        } else {
+            ins.msg = "Value from: ";
+            ins.printVar = randVar();
+        }
     } else if (roll < 50) {
         ins.type = InstructionType::DECLARE;
         ins.target = randVar();
