@@ -21,23 +21,6 @@ RUN
   Type "initialize" first (reads config.txt), then: screen -s <name>, screen -r <name>,
   screen -ls, scheduler-start, scheduler-stop, report-util, exit.
 
-WORK DIVISION
-  Member 1 - CLI / Console        : src/Console.cpp
-      banner + developer names, screen -s / -r / -ls parsing, process screen loop,
-      process-smi output, clearing the screen, error messages, report-util wiring.
-  Member 2 - Scheduler            : src/Scheduler.cpp
-      core worker logic: FCFS + Round Robin (quantum), preemption, sleeping processes
-      relinquishing the core, delay-per-exec busy-wait, finished list, tick barrier.
-  Member 3 - Processes/Instructions: src/Process.cpp, src/Instruction.cpp
-      PRINT/DECLARE/ADD/SUBTRACT/SLEEP/FOR semantics, uint16 clamping, random program
-      generator (FOR nesting <= 3), flattenProgram().
-  Member 4 - Config/Report/Docs   : src/Config.cpp, src/Report.cpp, src/ProcessFactory.cpp
-      config validation + error messages, screen -ls / report-util formatting and
-      csopesy-log.txt, duplicate-name checks, README, PPT technical report, test configs,
-      quiz-day demo videos.
-
-Search the code for "TODO(Member N)" to find each person's tasks.
-
 CONFIG FILE (config.txt, one "<parameter> <value>" per line, read by "initialize")
   num-cpu             [1, 128]
   scheduler           "fcfs" or "rr"
@@ -52,10 +35,3 @@ CONFIG FILE (config.txt, one "<parameter> <value>" per line, read by "initialize
 PROCESS NAMES
   Names are case-sensitive and unique for the whole session (running OR finished).
   scheduler-start names processes p01, p02, ... and skips names already used by "screen -s".
-
-TESTS: see tests/README.txt (sample configs + unit tests, no recompiling needed for configs).
-
-
-PPT TECHNICAL REPORT SECTIONS (required)
-  Command recognition | Console UI implementation | Command interpreter implementation
-  Process representation | Scheduler implementation
