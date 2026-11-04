@@ -1,8 +1,5 @@
-cmake_minimum_required(VERSION 3.10)
-project(csopesy_emulator CXX)
-
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
+cmake_minimum_required(VERSION 3.16)
+project(CSOPESY_Emulator LANGUAGES CXX)
 
 find_package(Threads REQUIRED)
 
@@ -17,9 +14,8 @@ add_executable(csopesy
     src/Report.cpp
     src/Utils.cpp
 )
-target_link_libraries(csopesy Threads::Threads)
-
-# Copy config.txt next to the executable so "initialize" can find it.
-add_custom_command(TARGET csopesy POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            ${CMAKE_SOURCE_DIR}/config.txt $<TARGET_FILE_DIR:csopesy>/config.txt)
+target_compile_features(csopesy PRIVATE cxx_std_17)
+target_link_libraries(csopesy PRIVATE Threads::Threads)
+set_target_properties(csopesy PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "$<1:${CMAKE_SOURCE_DIR}>"
+)

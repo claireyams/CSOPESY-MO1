@@ -19,7 +19,7 @@ void Console::printBanner() const {
               << "  Kristopher Lance Chiu\n"
               << "  Diana Angela Ramirez\n"
               << "  Rhian Claire Yamsuan\n"
-              << "  [Member 4 name]\n\n"
+              << "  Xan Luo Ke\n\n"
               << "Last updated: 11-03-2026\n"
               << "-------------------------------------------\n";
 }
@@ -136,8 +136,9 @@ void Console::cmdScreenNew(const std::string& name) {
         std::cout << "Process name cannot be empty.\n";
         return;
     }
-    // The factory owns collision handling with automatically generated names.
-    if (scheduler_->findActiveProcess(name)) {
+    // The factory remembers every name ever used (running or finished), so reports never
+    // show two different processes with the same name.
+    if (factory_->isNameTaken(name)) {
         std::cout << "Process " << name << " already exists.\n";
         return;
     }
