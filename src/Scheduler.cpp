@@ -98,7 +98,14 @@ void Scheduler::tickLoop() {
         if (generating_ && cfg_.batchProcessFreq > 0 && now % cfg_.batchProcessFreq == 0)
             addProcess(factory_.createAuto());
 
-        // TODO(Member 2): consider a barrier so all cores finish tick N before tick N+1 starts.
+        // Barrier: wait until every core has finished this tick before starting the next one,
+        // so no core can skip a CPU cycle (delay-per-exec / "one instruction per cycle").
+        {
+            std::unique_lock<std::mutex> lk(tickMtx_);
+            doneCv_.wait(lk, [&] {
+                return coresDone_ >= static_cast<std::uint64_t>(cfg_.numCpu) * now || !running_;
+            });
+        }
         std::this_thread::sleep_for(std::chrono::milliseconds(kTickSleepMs));
     }
 }
