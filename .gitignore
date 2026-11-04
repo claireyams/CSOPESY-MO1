@@ -1,1 +1,18 @@
+# Build directories and compiled artifacts
 build/
+cmake-build-*/
+*.exe
+*.o
+*.obj
+*.pdb
+*.ilk
+
+# Executables produced by the documented Linux/macOS build commands
+/csopesy
+/test_config
+/test_factory
+/test_process_delay
+
+# Generated utilization report and config-test scratch file
+/csopesy-log.txt
+/c.txt
