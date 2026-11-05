@@ -9,10 +9,10 @@ Group members:
 Entry file (main function): src/main.cpp
 
 BUILD (CMake, works on Windows/Linux/macOS)
-  mkdir build && cd build
-  cmake ..
-  cmake --build .
-  ./csopesy          (Windows: csopesy.exe)   <- run from the folder that contains config.txt
+  Run these commands from the project root (the folder containing config.txt):
+  cmake -S . -B build
+  cmake --build build
+  ./csopesy          (Windows PowerShell: .\csopesy.exe)
 
 BUILD (without CMake)
   g++ -std=c++17 -pthread src/*.cpp -o csopesy
