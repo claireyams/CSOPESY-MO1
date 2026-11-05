@@ -11,6 +11,7 @@ Process::Process(int id, std::string name, std::vector<Instruction> flatProgram)
       createdAt_(timestampNow()),
       program_(std::move(flatProgram)),
       totalLines_(program_.size()) {
+    vars_["x"] = 0;
     if (program_.empty()) finished_ = true;
 }
 

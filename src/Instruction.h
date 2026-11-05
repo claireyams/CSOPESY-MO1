@@ -32,8 +32,7 @@ struct Instruction {
     std::uint32_t            repeats = 0;
 };
 
-// builds a random (possibly nested) program whose executed length is within [minIns, maxIns].
-// PRINT msgs default to "Hello world from <processName>!".
+// builds alternating PRINT(x) and ADD(x, x, 1..10) instructions within [minIns, maxIns].
 std::vector<Instruction> generateRandomProgram(std::uint64_t minIns,
                                                std::uint64_t maxIns,
                                                const std::string& processName);

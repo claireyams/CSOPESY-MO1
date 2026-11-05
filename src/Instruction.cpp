@@ -109,7 +109,22 @@ std::vector<Instruction> generateRandomProgram(std::uint64_t minIns,
     const std::uint64_t target = randInt(minIns, maxIns);
 
     std::vector<Instruction> program;
-    build(target, 0, processName, program);
+    program.reserve(target);
+    for (std::uint64_t i = 0; i < target; ++i) {
+        Instruction ins;
+        if (i % 2 == 0) {
+            ins.type = InstructionType::PRINT;
+            ins.msg = "Value from: ";
+            ins.printVar = "x";
+        } else {
+            ins.type = InstructionType::ADD;
+            ins.target = "x";
+            ins.lhs.isVariable = true;
+            ins.lhs.varName = "x";
+            ins.rhs.literal = static_cast<std::uint16_t>(randInt(1, 10));
+        }
+        program.push_back(std::move(ins));
+    }
     return program;
 }
 
