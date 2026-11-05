@@ -4,7 +4,8 @@
 
 namespace {
 // Real-time length of one CPU tick. 
-constexpr int kTickSleepMs = 5;
+constexpr int kGenTickMs = 5;
+constexpr int kIdleSleepMs = 1;
 }
 
 Scheduler::Scheduler(const Config& cfg, ProcessFactory& factory)
@@ -86,17 +87,38 @@ std::uint64_t Scheduler::waitForTick(std::uint64_t lastSeen) {
 }
 
 void Scheduler::tickLoop() {
+    using Clock = std::chrono::steady_clock;
+    const auto startTime = Clock::now();
+    std::uint64_t genTick = 0;
+
     while (running_) {
+        const auto elapsedMs = std::chrono::duration_cast<std::chrono::milliseconds>(
+            Clock::now() - startTime).count();
+        const std::uint64_t genTarget = static_cast<std::uint64_t>(elapsedMs) / kGenTickMs;
+        
+        while (genTick < genTarget) {
+            ++genTick;
+            if(generating_ && cfg_.batchProcessFreq > 0 && genTick % cfg_.batchProcessFreq == 0) addProcess(factory_.createAuto());
+        }
+
+        bool idle;
+        {
+            std::lock_guard<std::mutex> lk(stateMtx_);
+            idle = readyQueue_.empty();
+            for (const auto& p: runningPerCore_)
+                if (p) {idle = false; break; }
+        }
+
+        if (idle) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(kIdleSleepMs));
+            continue;
+        }
         std::uint64_t now;
         {
             std::lock_guard<std::mutex> lk(tickMtx_);
             now = ++tick_;
         }
         tickCv_.notify_all();
-
-        // "scheduler-start": every batch-process-freq ticks, spawn a dummy process.
-        if (generating_ && cfg_.batchProcessFreq > 0 && now % cfg_.batchProcessFreq == 0)
-            addProcess(factory_.createAuto());
 
         // Barrier: wait until every core has finished this tick before starting the next one,
         // so no core can skip a CPU cycle (delay-per-exec / "one instruction per cycle").
@@ -106,7 +128,6 @@ void Scheduler::tickLoop() {
                 return coresDone_ >= static_cast<std::uint64_t>(cfg_.numCpu) * now || !running_;
             });
         }
-        std::this_thread::sleep_for(std::chrono::milliseconds(kTickSleepMs));
     }
 }
 
